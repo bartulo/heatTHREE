@@ -21,11 +21,17 @@
 		varying vec2 vUv;
 		uniform vec2 res;
 		uniform sampler2D bufferTexture;
+		uniform sampler2D imageTexture;
+		uniform vec4 smokeSource;
 		uniform float time;
 		
 		void main() {
             vec2 pixel = gl_FragCoord.xy / res.xy;
-            gl_FragColor = texture2D(bufferTexture, vUv);
+            gl_FragColor = texture2D(bufferTexture, pixel);
+            gl_FragColor.g = 1.0;
+            
+            float dist = distance(smokeSource.xy, gl_FragCoord.xy);
+            gl_FragColor.rgb += smokeSource.w * max(15.0 - dist, 0.0);
             
 			float xPixel = 1.0/res.x;//The size of a single pixel
 			float yPixel = 1.0/res.y;
@@ -60,13 +66,14 @@
 			scene = new THREE.Scene();
 			var width = window.innerWidth;
 			var height = window.innerHeight;
-			camera = new THREE.PerspectiveCamera( 45, width / height, 0.1, 10000 );
+			camera = new THREE.OrthographicCamera( -600, 600, 400, -400, 0.1, 10000 );
+			//~ camera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 0.1, 10000 );
 			camera.position.z = 1500;
 			
 			renderer = new THREE.WebGLRenderer();
 			renderer.setSize( window.innerWidth, window.innerHeight );
 			document.body.appendChild( renderer.domElement );
-			//~ controls = new THREE.OrbitControls( camera, renderer.domElement );
+			controls = new THREE.OrbitControls( camera, renderer.domElement );
             
             
 		}
@@ -93,12 +100,12 @@
 				 //Keeps the resolution
 				 imageTexture: {type: "t", value: imageTexture },
 				 time: {type:"f",value:Math.random()*Math.PI*2+Math.PI},
-				 smokeSource: {type: "vec3", value: new THREE.Vector3(0,0,0)}
+				 smokeSource: {type: "vec4", value: new THREE.Vector4(0,0,0)}
 				},
 				fragmentShader: document.getElementById( 'fragShader' ).innerHTML,
 				vertexShader: document.getElementById( 'vertexShader' ).innerHTML
 			} );
-			plane = new THREE.PlaneBufferGeometry( 1200, 700, 199, 199 );
+			plane = new THREE.PlaneBufferGeometry( 1200, 800, 199, 199 );
 			bufferObject = new THREE.Mesh( plane, bufferMaterial );
 			bufferScene.add(bufferObject);
 
@@ -116,18 +123,25 @@
 
 		bufferTextureSetup();
 		
+		var mouseDown = false; 
+		
 		function UpdateMousePosition(X,Y){
-			var mouseX = ((X -renderer.domElement.offsetLeft) / window.innerWidth) * 2 -1;
-		  	var mouseY = ((Y -renderer.domElement.offsetTop) / window.innerHeight) * 2  + 1;
-		  	var vector = new THREE.Vector3(mouseX, mouseY, 1);
+			var pX = ((X -renderer.domElement.offsetLeft) / window.innerWidth) * 2 -1;
+		  	var pY = ((Y -renderer.domElement.offsetTop) / window.innerHeight) * 2  + 1;
+			var mouseX = X;
+		  	var mouseY = window.innerHeight - Y;
+		  	var vector = new THREE.Vector3(pX, pY, 1);
 		
 			vector.unproject(camera);
 			var ray = new THREE.Raycaster(camera.position, vector.sub(camera.position).normalize());
 			var intersects = ray.intersectObjects( scene.children );
+			var p = intersects[0].point;
 
-		  	console.log(intersects);
-		  	//~ bufferMaterial.uniforms.smokeSource.value.x = intersects[0].point.x;
-		  	//~ bufferMaterial.uniforms.smokeSource.value.y = mouseY;
+		  	bufferMaterial.uniforms.smokeSource.value.x = mouseX;
+		  	bufferMaterial.uniforms.smokeSource.value.y = mouseY;
+		  	bufferMaterial.uniforms.smokeSource.value.z = 0;
+		  	bufferMaterial.uniforms.smokeSource.value.w = 0;
+		  	console.log(mouseX);
 		}
 		document.onmousemove = function(event){
 		  	UpdateMousePosition(event.clientX,event.clientY)
@@ -135,11 +149,11 @@
 
 		document.onmousedown = function(event){
 			mouseDown = true;
-			bufferMaterial.uniforms.smokeSource.value.z = 0.1;
+			bufferMaterial.uniforms.smokeSource.value.w = 0.1;
 		}
 		document.onmouseup = function(event){
 			mouseDown = false;
-			bufferMaterial.uniforms.smokeSource.value.z = 0;
+			bufferMaterial.uniforms.smokeSource.value.w = 0;
 		}
 
 
